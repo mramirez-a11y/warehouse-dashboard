@@ -306,7 +306,7 @@ async function loadSummary() {
     wifiDone = parseInt(row[2]) || 0;
 
     updateTabletDisplay();
-    updateNextPack(row[5], row[6] || '');
+    updateNextPack(row[5], row[7] || '');
     setStatus(true);
     document.getElementById('last-refresh').textContent =
       'Updated ' + new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
