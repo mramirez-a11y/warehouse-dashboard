@@ -219,6 +219,44 @@
     </div>
   </div>
 
+  <!-- PHONE TRACKER -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Camp Phones</span>
+      <span class="badge badge-blue" id="phone-badge">In Progress</span>
+    </div>
+    <div class="card-body">
+      <div class="stats-grid">
+        <div class="stat">
+          <div class="stat-label">Phones Done</div>
+          <div class="stat-value" id="phone-done">—</div>
+          <div class="stat-sub">of 120 needed</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Remaining</div>
+          <div class="stat-value" id="phone-remain-display">—</div>
+          <div class="stat-sub">to prep</div>
+        </div>
+      </div>
+      <div class="progress-wrap">
+        <div class="progress-row">
+          <span class="progress-label">Season progress</span>
+          <span class="progress-pct" id="phone-pct">0%</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" id="phone-bar" style="width:0%;background:#7B3FA0"></div></div>
+      </div>
+      <div class="divider"></div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:8px;font-weight:500">Update phone progress:</div>
+      <div class="input-row">
+        <div class="input-group">
+          <label>Phones done (season total)</label>
+          <input type="number" id="input-phone" placeholder="0" min="0" max="120">
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:6px">Per-camp checklist: Ask Claude "Phone targets today" for camps due this week.</div>
+    </div>
+  </div>
+
   <!-- NEXT PACK -->
   <div class="card">
     <div class="card-header">
@@ -282,6 +320,7 @@ const SHEET_ID  = '1Xd12TdHSPyJDVenb93mG4PbSpWbr8rwwinzEEEPaUTk';
 const TAB       = 'Summary';
 const CELL_TOTAL = 122;
 const WIFI_TOTAL = 112;
+const PHONE_TOTAL = 120;
 
 // Format today
 const now = new Date();
@@ -289,10 +328,10 @@ document.getElementById('today-date').textContent =
   now.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric', year:'numeric' });
 
 // Local state (fallback)
-let cellDone = 16, wifiDone = 24;
+let cellDone = 16, wifiDone = 24, phoneDone = 0;
 
 async function loadSummary() {
-  const range = encodeURIComponent(`${TAB}!A2:H2`);
+  const range = encodeURIComponent(`${TAB}!A2:J2`);
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${range}?key=${API_KEY}`;
   try {
     const res = await fetch(url);
@@ -301,11 +340,13 @@ async function loadSummary() {
     const row = data.values && data.values[0];
     if (!row) throw new Error('No data');
 
-    // B2=cell_done, C2=wifi_done, D2=cell_remain, E2=wifi_remain, F2=next_pack, G2=chair
+    // B2=cell_done, C2=wifi_done, D2=cell_remain, E2=wifi_remain, F2=next_pack, G2=chair, H2=camp_name, I2=phone_done
     cellDone = parseInt(row[1]) || 0;
     wifiDone = parseInt(row[2]) || 0;
+    phoneDone = parseInt(row[8]) || 0;
 
     updateTabletDisplay();
+    updatePhoneDisplay();
     updateNextPack(row[5], row[7] || '');
     setStatus(true);
     document.getElementById('last-refresh').textContent =
@@ -314,6 +355,7 @@ async function loadSummary() {
     console.error('Sheet read failed:', e);
     setStatus(false);
     updateTabletDisplay();
+    updatePhoneDisplay();
   }
 }
 
@@ -335,6 +377,17 @@ function updateTabletDisplay() {
   const b = document.getElementById('quota-badge');
   b.textContent = onTrack ? 'On Track' : 'Behind';
   b.className = 'badge ' + (onTrack ? 'badge-ok' : 'badge-warn');
+}
+
+function updatePhoneDisplay() {
+  document.getElementById('phone-done').textContent = phoneDone;
+  document.getElementById('phone-remain-display').textContent = PHONE_TOTAL - phoneDone;
+  const pp = Math.round(phoneDone / PHONE_TOTAL * 100);
+  document.getElementById('phone-pct').textContent = pp + '%';
+  document.getElementById('phone-bar').style.width = pp + '%';
+  const b = document.getElementById('phone-badge');
+  b.textContent = phoneDone >= PHONE_TOTAL ? 'Complete' : 'In Progress';
+  b.className = 'badge ' + (phoneDone >= PHONE_TOTAL ? 'badge-ok' : 'badge-blue');
 }
 
 function updateNextPack(val, campName) {
@@ -372,15 +425,20 @@ function loadPhones() {
 function saveQuota() {
   const cv = parseInt(document.getElementById('input-cell').value);
   const wv = parseInt(document.getElementById('input-wifi').value);
-  if (isNaN(cv) && isNaN(wv)) { alert('Enter at least one value.'); return; }
+  const pv = parseInt(document.getElementById('input-phone').value);
+  if (isNaN(cv) && isNaN(wv) && isNaN(pv)) { alert('Enter at least one value.'); return; }
   if (!isNaN(cv)) cellDone = cv;
   if (!isNaN(wv)) wifiDone = wv;
+  if (!isNaN(pv)) phoneDone = pv;
   updateTabletDisplay();
+  updatePhoneDisplay();
   document.getElementById('input-cell').value = '';
   document.getElementById('input-wifi').value = '';
+  document.getElementById('input-phone').value = '';
   const remain_c = CELL_TOTAL - cellDone;
   const remain_w = WIFI_TOTAL - wifiDone;
-  const msg = `Tablet update: ${cellDone} cell done (${remain_c} remaining), ${wifiDone} WiFi done (${remain_w} remaining). Update the Progress tab in WH Dashboard Data sheet and update the Context Doc.`;
+  const remain_p = PHONE_TOTAL - phoneDone;
+  const msg = `Progress update: Tablets — ${cellDone} cell done (${remain_c} remaining), ${wifiDone} WiFi done (${remain_w} remaining). Phones — ${phoneDone} done (${remain_p} remaining). Update the Progress tab in WH Dashboard Data sheet (columns B, C, G) and update the Context Doc.`;
   document.getElementById('confirm-msg').style.display = 'block';
   setTimeout(() => {
     window.open('https://claude.ai/new?q=' + encodeURIComponent(msg), '_blank');
